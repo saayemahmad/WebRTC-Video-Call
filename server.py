@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Simple HTTP server for WebRTC Video Caller
-Serves static files with proper MIME types and CORS headers
+Momo.vid - Premium Video Calling Server
+A simple HTTP server for serving the video calling application
 """
 
 import http.server
@@ -10,7 +10,8 @@ import os
 import sys
 from datetime import datetime
 
-PORT = 8000
+# Get port from environment variable (for Render) or use default
+PORT = int(os.environ.get('PORT', 8000))
 
 class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """Custom handler with CORS support and logging"""
@@ -37,31 +38,26 @@ def run_server():
     """Start the HTTP server"""
     
     # Change to script directory
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
     
     print("=" * 60)
-    print("🚀 WebRTC Video Caller Server - Premium Edition")
+    print("🚀 Momo.vid Server - Premium Video Calling")
     print("=" * 60)
     print(f"📁 Serving files from: {os.getcwd()}")
-    print(f"🌐 Server running at: http://localhost:{PORT}")
-    print(f"🔗 Open in browser: http://localhost:{PORT}")
+    print(f"🌐 Server running on port: {PORT}")
+    if PORT == 8000:
+        print(f"🔗 Local URL: http://localhost:{PORT}")
+    else:
+        print(f"🔗 Production mode (PORT from environment)")
     print("=" * 60)
-    print("📋 Premium Features:")
-    print("  ✓ User login system (Sayem/Shajeda)")
-    print("  ✓ Real-time online status detection")
-    print("  ✓ Automatic partner calling")
-    print("  ✓ Offline detection & protection")
-    print("  ✓ WhatsApp-like UI with dark theme")
+    print("📋 Features:")
+    print("  ✓ Real-time video calling")
+    print("  ✓ User profiles & online status")
+    print("  ✓ Call history tracking")
+    print("  ✓ Photo capture during calls")
+    print("  ✓ Premium glassmorphism UI")
     print("=" * 60)
-    print("🎯 Quick Start:")
-    print("  1. Open TWO browser windows at the URL above")
-    print("  2. Window 1: Login as 'Sayem'")
-    print("  3. Window 2: Login as 'Shajeda'")
-    print("  4. Click 'Call' button when partner is online")
-    print("  5. Video call connects automatically!")
-    print("=" * 60)
-    print("💡 Tip: Both users must be online to make a call")
-    print("Press Ctrl+C to stop the server\n")
+    print("💡 Press Ctrl+C to stop the server\n")
     
     # Check if required files exist
     required_files = ['index.html', 'app.js']
@@ -74,7 +70,8 @@ def run_server():
         print("✓ All required files found\n")
     
     try:
-        with socketserver.TCPServer(("", PORT), CustomHTTPRequestHandler) as httpd:
+        # Bind to 0.0.0.0 for Render compatibility
+        with socketserver.TCPServer(("0.0.0.0", PORT), CustomHTTPRequestHandler) as httpd:
             httpd.serve_forever()
     except KeyboardInterrupt:
         print("\n\n" + "=" * 60)
@@ -84,8 +81,7 @@ def run_server():
     except OSError as e:
         if e.errno == 98 or e.errno == 10048:  # Address already in use
             print(f"\n❌ ERROR: Port {PORT} is already in use!")
-            print(f"   Try closing other applications or use a different port.")
-            print(f"   You can change the PORT variable in this script.\n")
+            print(f"   Try closing other applications or use a different port.\n")
             sys.exit(1)
         else:
             raise

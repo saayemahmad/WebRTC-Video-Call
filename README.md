@@ -123,6 +123,55 @@ The app uses Firebase Realtime Database for signaling. The configuration is alre
 - Check Firebase connection in browser console
 - Ensure partner is actually logged in
 
+## Deployment to Render
+
+To deploy Momo.vid to Render.com:
+
+### Prerequisites
+- GitHub account
+- Render account (free tier available)
+
+### Steps
+
+1. **Push to GitHub**:
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git branch -M main
+   git remote add origin https://github.com/yourusername/momo-vid.git
+   git push -u origin main
+   ```
+
+2. **Deploy on Render**:
+   - Go to [Render Dashboard](https://dashboard.render.com/)
+   - Click "New +" → "Web Service"
+   - Connect your GitHub repository
+   - Configure:
+     - **Name**: momo-vid (or your choice)
+     - **Environment**: Python 3
+     - **Build Command**: (leave empty)
+     - **Start Command**: `python server.py`
+   - Click "Create Web Service"
+
+3. **Access Your App**:
+   - Your app will be available at: `https://your-app-name.onrender.com`
+   - Share this URL with others to use your video calling app!
+
+### Important Notes for Render Deployment
+
+- The app uses the `PORT` environment variable automatically
+- Render provides HTTPS by default (required for camera/microphone access)
+- Free tier may sleep after inactivity (takes ~30s to wake up)
+- Firebase configuration is already included in the code
+
+### Files for Deployment
+
+The following files are configured for Render:
+- `server.py` - Updated to use PORT environment variable
+- `requirements.txt` - Python dependencies (none required)
+- `render.yaml` - Optional Render configuration
+
 ## Development
 
 To modify the app:

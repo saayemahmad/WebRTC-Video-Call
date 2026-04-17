@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: momo-vid
+    env: python
+    buildCommand: echo "No build required"
+    startCommand: python server.py
+
