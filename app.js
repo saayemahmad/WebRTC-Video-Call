@@ -20,11 +20,16 @@ const database = getDatabase(app);
 // WebRTC configuration
 const configuration = {
     iceServers: [
+        // Google STUN servers
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
+        // Additional STUN servers for better reliability
+        { urls: 'stun:stun.services.mozilla.com' },
+        { urls: 'stun:stun.stunprotocol.org:3478' },
+        // Metered TURN servers
         {
             urls: 'turn:openrelay.metered.ca:80',
             username: 'openrelayproject',
@@ -39,9 +44,23 @@ const configuration = {
             urls: 'turn:openrelay.metered.ca:443?transport=tcp',
             username: 'openrelayproject',
             credential: 'openrelayproject'
+        },
+        // Additional free TURN servers
+        {
+            urls: 'turn:numb.viagenie.ca',
+            username: 'webrtc@live.com',
+            credential: 'muazkh'
+        },
+        {
+            urls: 'turn:turn.bistri.com:80',
+            username: 'homeo',
+            credential: 'homeo'
         }
     ],
-    iceCandidatePoolSize: 10
+    iceCandidatePoolSize: 10,
+    iceTransportPolicy: 'all', // Try all connection methods
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require'
 };
 
 // Global variables
@@ -380,10 +399,15 @@ async function initCall() {
     debugLog('Creating offer...', 'info');
     const offer = await peerConnection.createOffer({
         offerToReceiveAudio: true,
-        offerToReceiveVideo: true
+        offerToReceiveVideo: true,
+        iceRestart: false
     });
     await peerConnection.setLocalDescription(offer);
     debugLog('✓ Offer created', 'success');
+    
+    // Wait a bit for ICE gathering to collect more candidates
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    debugLog('ICE gathering phase complete, sending offer', 'info');
     
     // Save call data to Firebase
     const callRef = ref(database, `calls/${roomId}`);
@@ -611,6 +635,10 @@ async function answerCall(callData) {
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
     
+    // Wait a bit for ICE gathering
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    debugLog('ICE gathering phase complete, sending answer', 'info');
+    
     // Save answer
     const answerRef = ref(database, `calls/${roomId}/answer`);
     await set(answerRef, {
@@ -649,9 +677,18 @@ async function initLocalStream() {
             video: { width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: true
         });
+        
+        // Mute audio by default
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = false;
+            isMuted = true;
+            debugLog('Audio muted by default', 'info');
+        }
+        
         localVideo.srcObject = localStream;
         window.localStream = localStream;
-        debugLog('✓ Local stream initialized', 'success');
+        debugLog('✓ Local stream initialized (audio muted)', 'success');
         return true;
     } catch (error) {
         debugLog(`✗ Media error: ${error.message}`, 'error');
@@ -681,9 +718,18 @@ function createPeerConnection() {
     
     peerConnection.onicecandidate = event => {
         if (event.candidate) {
-            debugLog(`ICE candidate: ${event.candidate.type}`, 'info');
+            const candidateType = event.candidate.type || 'unknown';
+            debugLog(`ICE candidate: ${candidateType} (${event.candidate.protocol || 'unknown'})`, 'info');
+            
+            // Log relay candidates specially (TURN server working)
+            if (candidateType === 'relay') {
+                debugLog('✓ TURN server working! Relay candidate found', 'success');
+            }
+            
             const candidateRef = ref(database, `calls/${roomId}/candidates/${isCreator ? 'caller' : 'callee'}/${Date.now()}`);
             set(candidateRef, event.candidate.toJSON());
+        } else {
+            debugLog('ICE gathering complete', 'info');
         }
     };
     
@@ -694,7 +740,7 @@ function createPeerConnection() {
             showVideoCallScreen();
         } else if (peerConnection.connectionState === 'failed') {
             debugLog('✗ Connection failed', 'error');
-            window.showModal('Connection Failed', 'Connection failed. Please try again.', 'fa-exclamation-triangle');
+            window.showModal('Connection Failed', 'Could not establish connection. This may be due to:\n\n• Network/firewall restrictions\n• Both users behind strict NAT\n• TURN servers unavailable\n\nPlease check your network and try again.', 'fa-exclamation-triangle');
             hangup();
         } else if (peerConnection.connectionState === 'disconnected') {
             debugLog('⚠ Connection disconnected', 'warning');
@@ -704,7 +750,7 @@ function createPeerConnection() {
                     window.showModal('Connection Lost', 'The connection was lost. Please try again.', 'fa-wifi');
                     hangup();
                 }
-            }, 3000); // Wait 3 seconds for reconnection
+            }, 5000); // Wait 5 seconds for reconnection (increased from 3)
         } else if (peerConnection.connectionState === 'closed') {
             debugLog('Connection closed', 'info');
         }
@@ -723,6 +769,13 @@ function showVideoCallScreen() {
     // Record call start time
     callStartTime = Date.now();
     debugLog('Call connected, recording start time', 'info');
+    
+    // Update mute button to show muted state
+    const muteBtn = document.getElementById('muteBtn');
+    if (muteBtn && isMuted) {
+        muteBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+        muteBtn.classList.add('muted');
+    }
     
     // Start duration timer
     startDurationTimer();
